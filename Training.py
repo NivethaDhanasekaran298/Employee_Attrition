@@ -10,20 +10,30 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score
 
-# -----------------------------
-# Load & preprocess data
-# -----------------------------
+# -----------------------------------
+# Load & preprocess
+# -----------------------------------
 df = load_data(r"D:\Nivi\Python\EmployeeAttrition\Employee-Attrition - Employee-Attrition.csv")
 df = clean_data(df)
 df = encode_data(df)
 df = add_features(df)
 
-X = df.drop("Attrition", axis=1)
+# 🔑 Use only selected features
+SELECTED_FEATURES = [
+    "Age",
+    "MonthlyIncome",
+    "YearsAtCompany",
+    "JobSatisfaction",
+    "WorkLifeBalance",
+    "OverTime"
+]
+
+X = df[SELECTED_FEATURES]
 y = df["Attrition"]
 
-# -----------------------------
+# -----------------------------------
 # Train-test split
-# -----------------------------
+# -----------------------------------
 X_train, X_test, y_train, y_test = train_test_split(
     X, y,
     test_size=0.2,
@@ -31,24 +41,20 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-# -----------------------------
-# Logistic Regression (baseline)
-# -----------------------------
+# -----------------------------------
+# Logistic Regression
+# -----------------------------------
 log_pipeline = Pipeline([
     ("scaler", StandardScaler()),
     ("log_model", LogisticRegression(max_iter=1000))
 ])
 
 log_pipeline.fit(X_train, y_train)
+log_auc = roc_auc_score(y_test, log_pipeline.predict_proba(X_test)[:, 1])
 
-log_auc = roc_auc_score(
-    y_test,
-    log_pipeline.predict_proba(X_test)[:, 1]
-)
-
-# -----------------------------
-# Random Forest (final model)
-# -----------------------------
+# -----------------------------------
+# Random Forest
+# -----------------------------------
 rf_model = RandomForestClassifier(
     n_estimators=300,
     random_state=42,
@@ -56,21 +62,24 @@ rf_model = RandomForestClassifier(
 )
 
 rf_model.fit(X_train, y_train)
+rf_auc = roc_auc_score(y_test, rf_model.predict_proba(X_test)[:, 1])
 
-rf_auc = roc_auc_score(
-    y_test,
-    rf_model.predict_proba(X_test)[:, 1]
-)
-
-# -----------------------------
-# Compare & save best model
-# -----------------------------
+# -----------------------------------
+# Save best model
+# -----------------------------------
 print(f"Logistic Regression AUC : {log_auc:.4f}")
 print(f"Random Forest AUC       : {rf_auc:.4f}")
 
 best_model = rf_model if rf_auc >= log_auc else log_pipeline
 
 os.makedirs("models", exist_ok=True)
-joblib.dump(best_model, "models/attrition_model.pkl")
+
+joblib.dump(
+    {
+        "model": best_model,
+        "features": SELECTED_FEATURES
+    },
+    "models/attrition_model.pkl"
+)
 
 print("✅ Best model saved successfully")
